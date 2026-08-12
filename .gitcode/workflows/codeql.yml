@@ -1,0 +1,76 @@
+name: 代码质量扫描 (GitCode)
+
+# 对应 GitHub 的 codeql.yml;GitCode 无 CodeQL Action,改用开源静态分析工具(cppcheck / go vet / python 编译检查)
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  repository: read
+
+jobs:
+  analyze:
+    name: 静态分析
+    runs-on: [ubuntu-latest, x64, medium]
+    steps:
+      - uses: checkout
+
+      - name: 初始化子模块 (网站)
+        run: git submodule update --init --recursive
+
+      - name: 安装工具链
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cppcheck cmake gcc zlib1g-dev
+
+      - name: 检查 C/C++ (cppcheck)
+        run: |
+          cppcheck --enable=warning,performance,portability \
+            --std=c11 --error-exitcode=0 \
+            --suppress=missingIncludeSystem \
+            -I 地图生成器/src 地图生成器/src 2>&1 | tee /tmp/cppcheck.txt
+          echo "cppcheck 完成,见 /tmp/cppcheck.txt"
+
+      - name: 编译验证 (C)
+        run: |
+          cmake -S 地图生成器 -B build-check -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-check -j"$(nproc)"
+
+      - name: Go 后端静态检查 (go vet)
+        uses: setup-go
+        with:
+          go-version: '1.25.0'
+          cache: true
+      - name: go vet
+        working-directory: 网站/backend
+        run: |
+          if [ ! -f go.mod ]; then
+            echo "无 Go 模块,跳过 go vet"
+            exit 0
+          fi
+          go mod download
+          go vet ./...
+
+      - name: Python 脚本语法检查
+        run: |
+          if ls 脚本/*.py >/dev/null 2>&1; then
+            python3 -m py_compile 脚本/*.py
+            echo "Python 语法检查通过"
+          else
+            echo "无 Python 脚本,跳过"
+          fi
+
+      - name: 生成扫描摘要
+        run: |
+          {
+            echo "## 代码质量扫描摘要"
+            echo ""
+            echo "- cppcheck 完成"
+            echo "- C 编译验证完成"
+            echo "- Go vet 完成"
+            echo "- Python 语法检查完成"
+          } >> "$ATOMGIT_STEP_SUMMARY"

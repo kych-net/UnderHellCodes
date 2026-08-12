@@ -1,0 +1,190 @@
+name: Release (GitCode)
+
+# 与 GitHub Actions 的 release.yml 对应;GitCode 托管 Runner 仅提供 Linux(x64/arm64),macOS/Windows 需自托管
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+env:
+  QT_VERSION: 6.7.2
+
+permissions:
+  repository: write
+
+jobs:
+  # ---------- 创建/更新发行版 ----------
+  create-release:
+    name: 创建发行版
+    runs-on: [ubuntu-latest, x64, small]
+    outputs:
+      tag_name: ${{ steps.meta.outputs.tag_name }}
+    steps:
+      - name: 计算标签名
+        id: meta
+        run: |
+          if [[ "${ATOMGIT_REF}" == refs/tags/* ]]; then
+            echo "tag_name=${ATOMGIT_REF_NAME}" >> "$ATOMGIT_OUTPUT"
+          else
+            echo "tag_name=latest" >> "$ATOMGIT_OUTPUT"
+          fi
+
+      - name: 创建或更新 Release (v5 API)
+        env:
+          TAG: ${{ steps.meta.outputs.tag_name }}
+        run: |
+          set +e
+          API="https://gitcode.com/api/v5/repos/${ATOMGIT_REPOSITORY}"
+          if curl -sf "${API}/releases/tags/${TAG}?access_token=${ATOMGIT_TOKEN}" >/dev/null 2>&1; then
+            curl -s -X PATCH "${API}/releases/tag/${TAG}?access_token=${ATOMGIT_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "{\"name\":\"${TAG}\",\"body\":\"GitCode Actions 自动构建 ${ATOMGIT_SHA}\"}" >/dev/null || true
+            echo "已更新 Release: ${TAG}"
+          else
+            curl -s -X POST "${API}/releases?access_token=${ATOMGIT_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "{\"tag_name\":\"${TAG}\",\"name\":\"${TAG}\",\"body\":\"GitCode Actions 自动构建 ${ATOMGIT_SHA}\",\"draft\":false,\"prerelease\":false}" >/dev/null || true
+            echo "已创建 Release: ${TAG}"
+          fi
+          exit 0
+
+  # ---------- 命令行版 (Linux x64 / arm64) ----------
+  worldgen-cli:
+    name: 命令行版 (${{ matrix.name }})
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            arch: x64
+            flavor: small
+            release_file: mapgen-cli-linux-x86_64
+          - name: linux-arm64
+            arch: arm64
+            flavor: medium
+            release_file: mapgen-cli-linux-arm64
+    runs-on: ubuntu-24,${{ matrix.arch }},${{ matrix.flavor }}
+    steps:
+      - uses: checkout
+
+      - name: 安装 zlib
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zlib1g-dev
+
+      - name: 配置
+        run: cmake -S 地图生成器 -B build-cli -DCMAKE_BUILD_TYPE=Release
+
+      - name: 编译
+        run: cmake --build build-cli -j"$(nproc)"
+
+      - name: 收集产物
+        run: |
+          mkdir -p /tmp/artifacts
+          cp "build-cli/地图生成器" "/tmp/artifacts/${{ matrix.release_file }}"
+
+      - name: 上传产物 (Artifact)
+        uses: upload-artifact
+        with:
+          name: ${{ matrix.release_file }}
+          path: /tmp/artifacts/
+
+      - name: 上传到 Release (尽力而为)
+        env:
+          TAG: ${{ needs.create-release.outputs.tag_name }}
+        run: |
+          API="https://gitcode.com/api/v5/repos/${ATOMGIT_REPOSITORY}"
+          for f in /tmp/artifacts/*; do
+            UPLOAD_URL=$(curl -s "${API}/releases/tag/${TAG}/upload-url?access_token=${ATOMGIT_TOKEN}" \
+              | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d.get("upload_url") or "")' 2>/dev/null)
+            if [ -n "$UPLOAD_URL" ]; then
+              curl -s -X POST "$UPLOAD_URL" -F "file=@$f" >/dev/null && echo "已上传附件: $f" || echo "附件上传失败: $f"
+            else
+              echo "警告: 未获取到上传地址, 跳过附件 $f"
+            fi
+          done
+
+  # ---------- GUI 图形版 (Linux x64 / arm64) ----------
+  worldgen-gui:
+    name: GUI (${{ matrix.name }})
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            arch: x64
+            flavor: medium
+            release_file: mapgen-gui-linux-x86_64
+          - name: linux-arm64
+            arch: arm64
+            flavor: large
+            release_file: mapgen-gui-linux-arm64
+    runs-on: ubuntu-24,${{ matrix.arch }},${{ matrix.flavor }}
+    steps:
+      - uses: checkout
+
+      - name: 安装构建依赖 (Qt6 + 编译链)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            qt6-base-dev zlib1g-dev libgl1-mesa-dev libxkbcommon-dev \
+            libfontconfig1-dev libdbus-1-dev libglib2.0-dev libxcb1-dev \
+            libxcb-cursor-dev libxcb-icccm4-dev libxcb-image0-dev \
+            libxcb-keysyms1-dev libxcb-randr0-dev libxcb-render-util0-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev libxcb-xinerama0-dev
+
+      - name: 配置
+        run: cmake -S 地图生成器 -B build-gui -DBUILD_GUI=ON -DCMAKE_BUILD_TYPE=Release
+
+      - name: 编译
+        run: cmake --build build-gui -j"$(nproc)"
+
+      - name: 打包 (AppImage,失败退回 tar.gz)
+        run: |
+          set -e
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+          export PATH=/usr/lib/qt6/bin:$PATH
+          export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+          printf '%s\n' '[Desktop Entry]' 'Name=地图生成器' 'Comment=地图生成器' 'Exec=地图生成器' 'Icon=worldgen_gui' 'Type=Application' 'Categories=Utility;Graphics;' > worldgen_gui.desktop
+          cp 地图生成器/src/gui/images/world-generator-icon.png worldgen_gui.png
+          set +e
+          ./linuxdeploy-x86_64.AppImage --appimage-extract-and-run --appdir AppDir \
+            --executable build-gui/地图生成器 \
+            --desktop-file worldgen_gui.desktop \
+            --icon-file worldgen_gui.png \
+            --plugin qt --output appimage
+          APPIMAGE_OK=$?
+          set -e
+          mkdir -p /tmp/artifacts
+          if [ $APPIMAGE_OK -eq 0 ] && ls worldgen_gui-*.AppImage >/dev/null 2>&1; then
+            mv worldgen_gui-*.AppImage "/tmp/artifacts/${{ matrix.release_file }}.AppImage"
+          else
+            echo "AppImage 打包失败,退回压缩包"
+            tar -czf "/tmp/artifacts/${{ matrix.release_file }}.tar.gz" -C build-gui 地图生成器
+          fi
+
+      - name: 上传产物 (Artifact)
+        uses: upload-artifact
+        with:
+          name: ${{ matrix.release_file }}
+          path: /tmp/artifacts/
+
+      - name: 上传到 Release (尽力而为)
+        env:
+          TAG: ${{ needs.create-release.outputs.tag_name }}
+        run: |
+          API="https://gitcode.com/api/v5/repos/${ATOMGIT_REPOSITORY}"
+          for f in /tmp/artifacts/*; do
+            UPLOAD_URL=$(curl -s "${API}/releases/tag/${TAG}/upload-url?access_token=${ATOMGIT_TOKEN}" \
+              | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d.get("upload_url") or "")' 2>/dev/null)
+            if [ -n "$UPLOAD_URL" ]; then
+              curl -s -X POST "$UPLOAD_URL" -F "file=@$f" >/dev/null && echo "已上传附件: $f" || echo "附件上传失败: $f"
+            else
+              echo "警告: 未获取到上传地址, 跳过附件 $f"
+            fi
+          done
