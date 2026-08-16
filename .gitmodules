@@ -1,3 +1,6 @@
 [submodule "网站"]
 	path = 网站
 	url = https://github.com/CrossDark/UnderHellWeb.git
+[submodule "地图工具"]
+	path = 地图工具
+	url = https://gitcode.com/CrossDark/MapTool.git
