@@ -1,0 +1,9 @@
+# Nuitka 编译产物
+元素工具.bin
+元素工具.dist/
+元素工具.build/
+元素工具.onefile-build/
+nuitka-crash-report.xml
+# Python 缓存
+__pycache__/
+*.pyc

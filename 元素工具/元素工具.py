@@ -22,12 +22,33 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
 
-# 仓库根:元素工具位于 程序/元素工具/,上级两层的父级即仓库根
-ROOT = Path(__file__).resolve().parent.parent.parent
+# 定位仓库根:优先 源码所在位置 -> UNDERHELL_ROOT 环境变量 -> 当前目录,
+# 取第一个其下含 文档/ 的候选。Nuitka 单文件运行时 __file__ 指向临时解包目录,
+# 故需回退到环境变量或当前工作目录。
+# / Locate the repo root by trying, in order: script location, the
+# UNDERHELL_ROOT env var, then the current working directory, taking the first
+# that contains a 文档/ folder (single-file builds unpack __file__ to a temp dir).
+def _guess_root() -> Path:
+    cands: list[Path] = []
+    try:
+        cands.append(Path(__file__).resolve().parent.parent.parent)
+    except NameError:
+        pass
+    env = os.environ.get("UNDERHELL_ROOT")
+    if env:
+        cands.append(Path(env))
+    cands.append(Path.cwd())
+    for c in cands:
+        if (c / "文档").is_dir():
+            return c
+    return cands[0]
+
+ROOT = _guess_root()
 DEFAULT_DOC_DIR = ROOT / "文档"
 DEFAULT_CSV = ROOT / "文档" / "元素系统.csv"
 
