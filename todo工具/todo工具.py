@@ -92,12 +92,16 @@ def cmd_list(args) -> None:
     hits = find_todos(files, args.include)
     out = args.out
     out.parent.mkdir(parents=True, exist_ok=True)
-    lines = ["# 待办列表", "", f"- 共 {len(hits)} 条 #TODO" if hits else "- 当前无 #TODO", ""]
-    for f, ln, text in hits:
+    lines = ["# 待办表格", "",
+             f"- 共 {len(hits)} 条 #TODO" if hits else "- 当前无 #TODO", "",
+             "| 编号 | 位置(文件:行) | TODO 内容 |",
+             "|---|---|---|"]
+    for i, (f, ln, text) in enumerate(hits, 1):
         preview = text if text else "(空)"
-        lines.append(f"- [ ] {f}:{ln}: {preview}")
+        preview = preview.replace("|", "\\|")
+        lines.append(f"| {i} | {f}:{ln} | {preview} |")
     out.write_text("\n".join(lines).rstrip("\n") + "\n", encoding="utf-8")
-    print(f"已写入 {len(hits)} 条 #TODO 列表到: {out}")
+    print(f"已写入 {len(hits)} 条 #TODO 表格到: {out}")
 
 
 def build_parser() -> argparse.ArgumentParser:
