@@ -91,6 +91,31 @@ def scan_ids(files: list[Path]) -> set[str]:
     return ids
 
 
+# 仅用于"设定(定义)"元素的模式:同一 id 若被设定多次则视为重复定义
+SETTING_PATTERNS = [
+    re.compile(r'#设定元素\(\s*"([^"]+)"\s*\)'),                    # #设定元素("名")
+    re.compile(r'#设定元素\[([^\]]+?)\]'),                          # #设定元素[名]
+    re.compile(r'#设定元素\([^)]*level\s*:\s*\d+[^)]*\)\[([^\]]+?)\]'),  # #设定元素(level: n)[名]
+]
+
+
+def scan_setting_counts(files: list[Path]) -> dict[str, int]:
+    """统计每个元素被 #设定元素 设定的次数;>1 表示重复定义。"""
+    counts: dict[str, int] = {}
+    for f in files:
+        try:
+            text = f.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as e:
+            print(f"[跳过] {f}: {e}")
+            continue
+        for pat in SETTING_PATTERNS:
+            for m in pat.finditer(text):
+                id_ = m.group(1).strip()
+                if id_:
+                    counts[id_] = counts.get(id_, 0) + 1
+    return counts
+
+
 def read_csv_ids(csv_path: Path) -> set[str]:
     """读取 CSV 第一列(id 列,去掉表头)的全部 id。"""
     if not csv_path.exists():
@@ -110,6 +135,13 @@ def cmd_scan(args) -> None:
     ids = sorted(idset)
     csv_ids = read_csv_ids(args.csv)
     missing = sorted(idset - csv_ids)
+    # 重复设定警告:同一元素被 #设定元素 设定了两次以上
+    setting = scan_setting_counts(files)
+    dup = sorted(k for k, v in setting.items() if v > 1)
+    if dup:
+        print("警告:以下元素被 #设定元素 设定了多次(疑似重复定义):")
+        for id_ in dup:
+            print(f"  ⚠ {id_}: 设定 {setting[id_]} 次")
     print(f"扫描 {len(files)} 个 .typ 文件,共 {len(ids)} 个唯一元素:")
     for id_ in ids:
         mark = "" if id_ in csv_ids else "  <-- 缺失,CSV 未收录"
