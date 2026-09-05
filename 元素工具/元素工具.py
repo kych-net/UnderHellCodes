@@ -151,14 +151,20 @@ def cmd_update_csv(args) -> None:
 def cmd_cleanup(args) -> None:
     files = collect_source_files(args.dir)
     doc_ids = scan_ids(files)
-    csv_ids = read_csv_ids(args.csv)
-    orphans = sorted(csv_ids - doc_ids)
+    csv_path = args.csv
+    if not csv_path.exists():
+        sys.exit(f"[错误] CSV 不存在: {csv_path}")
+    rows = csv_path.read_text(encoding="utf-8").splitlines()
+    header = rows[0]
+    orphans = set(sorted({r.split(",")[0].strip() for r in rows[1:] if r.strip()} - doc_ids))
     if not orphans:
         print("CSV 中所有元素均在文档中被引用,无已删除的孤儿元素。")
         return
-    print(f"CSV 中存在、但文档已不再引用的元素 {len(orphans)} 个"
-          f"(可从 {args.csv} 中删除):")
-    for id_ in orphans:
+    # 保留非孤儿元素的行,删除孤儿行
+    keep = [header] + [r for r in rows[1:] if r.strip() and r.split(",")[0].strip() not in orphans]
+    csv_path.write_text("\n".join(keep).rstrip("\n") + "\n", encoding="utf-8")
+    print(f"已从 {csv_path} 删除 {len(orphans)} 个元素(文档已不再引用):")
+    for id_ in sorted(orphans):
         print(f"  - {id_}")
 
 
