@@ -92,7 +92,11 @@ def scan_ids(files: list[Path]) -> set[str]:
 
 
 def scan_ordered_ids(files: list[Path]) -> list[str]:
-    """按文档中首次出现顺序返回元素 id 列表(去重)。"""
+    """按文档中 #设定元素 定义的出现顺序返回元素 id 列表(去重)。
+
+    仅统计"定义"(#设定元素),不含普通引用(#元素);仅被引用而无定义的元素
+    不计入顺序,由调用方归为"未定义"排末尾。
+    """
     seen: set[str] = set()
     order: list[str] = []
     for f in files:
@@ -101,9 +105,9 @@ def scan_ordered_ids(files: list[Path]) -> list[str]:
         except (OSError, UnicodeDecodeError) as e:
             print(f"[跳过] {f}: {e}")
             continue
-        # 收集本文件内所有命中,按源偏移排序以体现真实出现顺序
+        # 只收集 #设定元素,按源偏移排序以体现真实定义顺序
         hits: list[tuple[int, str]] = []
-        for pat in PATTERNS:
+        for pat in SETTING_PATTERNS:
             for m in pat.finditer(text):
                 id_ = m.group(1).strip()
                 if id_:
