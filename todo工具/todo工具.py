@@ -87,11 +87,30 @@ def cmd_find(args) -> None:
         print(f"共 {total} 条 #TODO。")
 
 
+def _csv_cell(value: object) -> str:
+    """CSV 单元格转义:含逗号/引号/换行时用括号包裹。"""
+    s = str(value) if value is not None else ""
+    if any(c in s for c in (',', '"', '\n', '\r')):
+        return '"' + s.replace('"', '""') + '"'
+    return s
+
+
 def cmd_list(args) -> None:
     files = collect_files(args.dir)
     hits = find_todos(files, args.include)
-    out = args.out
+    base = args.dir.resolve()
+    out = args.out or (args.dir / ("待办.csv" if args.format == "csv" else "待办.md"))
     out.parent.mkdir(parents=True, exist_ok=True)
+    if args.format == "csv":
+        lines = ["编号,位置,内容"]
+        for i, (f, ln, text) in enumerate(hits, 1):
+            rel = f.relative_to(base)
+            lines.append(",".join([
+                _csv_cell(i), _csv_cell(f"{rel}:{ln}"), _csv_cell(text or ""),
+            ]))
+        out.write_text("\n".join(lines).rstrip("\n") + "\n", encoding="utf-8")
+        print(f"已导出 {len(hits)} 条 #TODO 到 CSV: {out}")
+        return
     lines = ["# 待办表格", "",
              f"- 共 {len(hits)} 条 #TODO" if hits else "- 当前无 #TODO", "",
              "| 编号 | 位置(文件:行) | TODO 内容 |",
@@ -99,7 +118,8 @@ def cmd_list(args) -> None:
     for i, (f, ln, text) in enumerate(hits, 1):
         preview = text if text else "(空)"
         preview = preview.replace("|", "\\|")
-        lines.append(f"| {i} | {f}:{ln} | {preview} |")
+        rel = f.relative_to(base)
+        lines.append(f"| {i} | {rel}:{ln} | {preview} |")
     out.write_text("\n".join(lines).rstrip("\n") + "\n", encoding="utf-8")
     print(f"已写入 {len(hits)} 条 #TODO 表格到: {out}")
 
@@ -120,8 +140,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub = ap.add_subparsers(dest="command")
     p_list = sub.add_parser("列表", parents=[parent],
                             help="输出 Todo 列表文件(默认 文档/待办.md)")
-    p_list.add_argument("--out", type=Path, default=DEFAULT_DOC_DIR / "待办.md",
-                        help="输出文件路径(默认 与文档同目录的 待办.md)")
+    p_list.add_argument("--out", type=Path, default=None,
+                        help="输出文件路径(缺省:按格式 待办.md / 待办.csv,与文档同目录)")
+    p_list.add_argument("--format", choices=["md", "csv"], default="md",
+                        help="输出格式:md(Markdown 表格,默认)或 csv")
     p_list.set_defaults(func=cmd_list)
     return ap
 
