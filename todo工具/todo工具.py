@@ -3,10 +3,12 @@
 """Todo 工具:查找源文件(默认 仓库根/文档 下的全部 .typ)中所有 `#TODO[...]`。
 
 用法:
-  python3 todo工具.py                     # 列出所有 TODO
+  python3 todo工具.py                     # 在终端列出所有 TODO
   python3 todo工具.py --dir 路径            # 指定扫描目录
   python3 todo工具.py --include "内容"      # 仅匹配文件名含 内容 的
-  python3 todo工具.py --limit 20           # 最多显示 20 条
+  python3 todo工具.py --limit 20           # 最多显示 20 条(仅终端列出时)
+  python3 todo工具.py 列表 [--out 路径]      # 输出 Todo 列表文件
+                                          # (默认 文档/待办.md,即与文档同目录)
 
 默认仓库根定位顺序:源码位置 -> UNDERHELL_ROOT 环境变量 -> 当前目录。
 """
@@ -18,7 +20,7 @@ import re
 import sys
 from pathlib import Path
 
-TODO_RE = re.compile(r"#TODO\[([^\]]*)\]")
+TODO_RE = re.compile(r"#TODO\[(.*)\]")
 
 
 def _guess_root() -> Path:
@@ -85,15 +87,38 @@ def cmd_find(args) -> None:
         print(f"共 {total} 条 #TODO。")
 
 
+def cmd_list(args) -> None:
+    files = collect_files(args.dir)
+    hits = find_todos(files, args.include)
+    out = args.out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    lines = ["# 待办列表", "", f"- 共 {len(hits)} 条 #TODO" if hits else "- 当前无 #TODO", ""]
+    for f, ln, text in hits:
+        preview = text if text else "(空)"
+        lines.append(f"- [ ] {f}:{ln}: {preview}")
+    out.write_text("\n".join(lines).rstrip("\n") + "\n", encoding="utf-8")
+    print(f"已写入 {len(hits)} 条 #TODO 列表到: {out}")
+
+
 def build_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="todo工具", description="查找源文件中所有 #TODO")
-    ap.add_argument("--dir", type=Path, default=DEFAULT_DOC_DIR,
-                    help="扫描目录(默认 仓库根/文档)")
-    ap.add_argument("--include", default=None,
-                    help="仅匹配文件名包含该关键字的文件")
+    parent = argparse.ArgumentParser(add_help=False)
+    parent.add_argument("--dir", type=Path, default=DEFAULT_DOC_DIR,
+                        help="扫描目录(默认 仓库根/文档)")
+    parent.add_argument("--include", default=None,
+                        help="仅匹配文件名包含该关键字的文件")
+
+    ap = argparse.ArgumentParser(prog="todo工具", parents=[parent],
+                                 description="查找源文件中所有 #TODO")
     ap.add_argument("--limit", type=int, default=None,
-                    help="最多显示条数")
+                    help="终端列出时最多显示条数")
     ap.set_defaults(func=cmd_find)
+
+    sub = ap.add_subparsers(dest="command")
+    p_list = sub.add_parser("列表", parents=[parent],
+                            help="输出 Todo 列表文件(默认 文档/待办.md)")
+    p_list.add_argument("--out", type=Path, default=DEFAULT_DOC_DIR / "待办.md",
+                        help="输出文件路径(默认 与文档同目录的 待办.md)")
+    p_list.set_defaults(func=cmd_list)
     return ap
 
 
