@@ -148,6 +148,20 @@ def cmd_update_csv(args) -> None:
         print(f"  + {id_}")
 
 
+def cmd_cleanup(args) -> None:
+    files = collect_source_files(args.dir)
+    doc_ids = scan_ids(files)
+    csv_ids = read_csv_ids(args.csv)
+    orphans = sorted(csv_ids - doc_ids)
+    if not orphans:
+        print("CSV 中所有元素均在文档中被引用,无已删除的孤儿元素。")
+        return
+    print(f"CSV 中存在、但文档已不再引用的元素 {len(orphans)} 个"
+          f"(可从 {args.csv} 中删除):")
+    for id_ in orphans:
+        print(f"  - {id_}")
+
+
 def _replace_in_file(path: Path, old: str, new: str) -> int:
     """在单个源文件中重命名元素引用、静态标签与引用,返回替换次数。"""
     text = path.read_text(encoding="utf-8")
@@ -225,6 +239,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_csv = sub.add_parser("补全", parents=[parent], help="把缺失元素追加到 CSV")
     p_csv.set_defaults(func=cmd_update_csv)
+
+    p_cln = sub.add_parser("清理", parents=[parent],
+                           help="查找 CSV 中存在、但文档已删除(不再引用)的元素")
+    p_cln.set_defaults(func=cmd_cleanup)
 
     p_ren = sub.add_parser("改名", parents=[parent], help="重命名元素 id")
     p_ren.add_argument("old", help="旧 id")
