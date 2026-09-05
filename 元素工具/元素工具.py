@@ -91,6 +91,31 @@ def scan_ids(files: list[Path]) -> set[str]:
     return ids
 
 
+def scan_ordered_ids(files: list[Path]) -> list[str]:
+    """按文档中首次出现顺序返回元素 id 列表(去重)。"""
+    seen: set[str] = set()
+    order: list[str] = []
+    for f in files:
+        try:
+            text = f.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as e:
+            print(f"[跳过] {f}: {e}")
+            continue
+        # 收集本文件内所有命中,按源偏移排序以体现真实出现顺序
+        hits: list[tuple[int, str]] = []
+        for pat in PATTERNS:
+            for m in pat.finditer(text):
+                id_ = m.group(1).strip()
+                if id_:
+                    hits.append((m.start(), id_))
+        hits.sort(key=lambda t: t[0])
+        for _, id_ in hits:
+            if id_ not in seen:
+                seen.add(id_)
+                order.append(id_)
+    return order
+
+
 # 仅用于"设定(定义)"元素的模式:同一 id 若被设定多次则视为重复定义
 SETTING_PATTERNS = [
     re.compile(r'#设定元素\(\s*"([^"]+)"\s*\)'),                    # #设定元素("名")
@@ -200,6 +225,27 @@ def cmd_cleanup(args) -> None:
         print(f"  - {id_}")
 
 
+def cmd_sort(args) -> None:
+    files = collect_source_files(args.dir)
+    order = scan_ordered_ids(files)
+    pos = {id_: i for i, id_ in enumerate(order)}
+    csv_path = args.csv
+    if not csv_path.exists():
+        sys.exit(f"[错误] CSV 不存在: {csv_path}")
+    rows = csv_path.read_text(encoding="utf-8").splitlines()
+    header = rows[0]
+    body = [r for r in rows[1:] if r.strip()]
+    # 已定义:按文档首次出现顺序;未定义(文档未出现):排在最后,保持 CSV 原相对顺序
+    defined, undefined = [], []
+    for i, r in enumerate(body):
+        (undefined if r.split(",")[0].strip() not in pos else defined).append(i)
+    defined.sort(key=lambda i: pos[body[i].split(",")[0].strip()])
+    new_body = [body[i] for i in defined + undefined]
+    csv_path.write_text("\n".join([header] + new_body).rstrip("\n") + "\n", encoding="utf-8")
+    print(f"已按文档中定义顺序排序 {csv_path}:")
+    print(f"  已定义(按文档顺序) {len(defined)} 项;未定义(排末尾) {len(undefined)} 项")
+
+
 def _replace_in_file(path: Path, old: str, new: str) -> int:
     """在单个源文件中重命名元素引用、静态标签与引用,返回替换次数。"""
     text = path.read_text(encoding="utf-8")
@@ -281,6 +327,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_cln = sub.add_parser("清理", parents=[parent],
                            help="查找 CSV 中存在、但文档已删除(不再引用)的元素")
     p_cln.set_defaults(func=cmd_cleanup)
+
+    p_sort = sub.add_parser("排序", parents=[parent],
+                            help="按文档中定义顺序重排 CSV,未定义元素排末尾")
+    p_sort.set_defaults(func=cmd_sort)
 
     p_ren = sub.add_parser("改名", parents=[parent], help="重命名元素 id")
     p_ren.add_argument("old", help="旧 id")
