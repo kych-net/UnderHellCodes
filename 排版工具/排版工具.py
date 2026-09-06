@@ -40,6 +40,28 @@ PUNCT_SPACE_RE = re.compile(r"(?<=[,.;:])(?=[\u4e00-\u9fff])")
 # 摄氏度换算为开尔文:K = °C + 273.15,取整(匹配数字…"°C" 完整片段)
 CELS_RE = re.compile(r'(-?\d+(?:\.\d+)?)\s*"?\s*[°℃]C?"?')
 
+# 句子结尾标点(缺则视为句尾缺失点号)
+END_PUNCT = set(".。！？!?…")
+# 判定是否为"正文内容行"(排除标题/表格/列表/结构指令/代码/空行;
+# 以 `#元素[…` 开头的正文句子保留;其它 `#函数` 调用行一律视为非正文)
+def is_body_line(ln: str) -> bool:
+    head = ln.lstrip()
+    if not head:
+        return False
+    if (
+        head[0] in "-[]|"
+        or head.startswith("==")
+        or head.startswith("//")
+        or (head.startswith("#") and not head.startswith("#元素["))
+    ):
+        return False
+    return True
+
+
+def missing_period(ln: str) -> bool:
+    s = ln.rstrip()
+    return bool(s) and s[-1] not in END_PUNCT
+
 
 def fix_celsius(ln: str) -> str:
     def repl(m):
@@ -111,6 +133,8 @@ def check_file(f: Path, rel: str) -> list[str]:
             issues.append(f"  {rel}:{i}: 内容标点后缺空格 -> {body[:38]}")
         if CN_BIG_RE.search(ln):
             issues.append(f"  {rel}:{i}: 万级大数未用科学计数法 -> {body[:38]}")
+        if is_body_line(ln) and missing_period(ln):
+            issues.append(f"  {rel}:{i}: 句子结尾缺失点号 -> {body[:38]}")
     return issues
 
 
@@ -127,11 +151,13 @@ def cmd_check(args) -> None:
 
 
 def fix_line(ln: str) -> str:
-    # 全角标点钟表;°C→K;内容标点后补空格;中文字符空格
+    # 全角标点钟表;°C→K;内容标点后补空格;中文字符空格;句尾补点号
     new = FULLWIDTH_RE.sub(TO_REPLACE, ln)
     new = fix_celsius(new)
     new = PUNCT_SPACE_RE.sub(" ", new)
     new = CN_SPACE_RE.sub(r"\1\2", new)
+    if is_body_line(new) and missing_period(new):
+        new = new.rstrip() + "."
     return new
 
 
