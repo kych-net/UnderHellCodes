@@ -44,7 +44,8 @@ CELS_RE = re.compile(r'(-?\d+(?:\.\d+)?)\s*"?\s*[°℃]C?"?')
 def fix_celsius(ln: str) -> str:
     def repl(m):
         k = round(float(m.group(1)) + 273.15)
-        return f'{k} "K"'
+        unit = '"K"' if '"' in m.group(0) else "K"
+        return f'{k} {unit}'
     return CELS_RE.sub(repl, ln)
 
 

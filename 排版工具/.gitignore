@@ -1,0 +1,9 @@
+# Nuitka 编译产物
+排版工具.bin
+排版工具.dist/
+排版工具.build/
+排版工具.onefile-build/
+nuitka-crash-report.xml
+# Python 缓存
+__pycache__/
+*.pyc
