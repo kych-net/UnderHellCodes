@@ -42,17 +42,21 @@ CELS_RE = re.compile(r'(-?\d+(?:\.\d+)?)\s*"?\s*[°℃]C?"?')
 
 # 句子结尾标点(缺则视为句尾缺失点号)
 END_PUNCT = set(".。！？!?…")
-# 判定是否为"正文内容行"(排除标题/表格/列表/结构指令/代码/空行;
-# 以 `#元素[…` 开头的正文句子保留;其它 `#函数` 调用行一律视为非正文)
+# 判定是否为"正文内容行"(排除标题/表格/列表/结构指令/代码/参数行/空行;
+# 以 `#元素[…` 开头的正文句子保留;其它 `#函数`、赋值/函数调用/配置续行均视为非正文)
+CODE_WORD = re.compile(r"\b(let|const|node|edge|return|import|struct|for|while)\b|=>|:=|::")
 def is_body_line(ln: str) -> bool:
     head = ln.lstrip()
     if not head:
         return False
+    end = head.rstrip()
     if (
         head[0] in "-[]|"
         or head.startswith("==")
         or head.startswith("//")
         or (head.startswith("#") and not head.startswith("#元素["))
+        or CODE_WORD.search(head)
+        or end.endswith((",", "(", "=", "{", "}", ";", ":", ")", "]"))
     ):
         return False
     return True
