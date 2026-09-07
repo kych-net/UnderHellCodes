@@ -7,3 +7,5 @@ nuitka-crash-report.xml
 # Python 缓存
 __pycache__/
 *.pyc
+# Mojo 构建产物
+*-mojo
