@@ -3,4 +3,4 @@
 	url = https://github.com/CrossDark/UnderHellWeb.git
 [submodule "地图工具"]
 	path = 地图工具
-	url = https://gitcode.com/CrossDark/MapTool.git
+	url = https://github.com/kych-net/MapTool.git
