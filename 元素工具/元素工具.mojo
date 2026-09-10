@@ -534,6 +534,113 @@ def cmd_sort(doc_dir: String, csv_path: String) raises:
 # ---------- 入口 ----------
 
 
+# 子串替换(码点级)
+def replace_plain(text: String, old: String, new: String) -> String:
+    var out = String("")
+    var cps = to_codepoints(text)
+    var ocps = to_codepoints(old)
+    var ncps = to_codepoints(new)
+    var n = len(cps)
+    var m = len(ocps)
+    var i = 0
+    while i < n:
+        if i + m <= n:
+            var ok = True
+            for j in range(m):
+                if cps[i + j] != ocps[j]:
+                    ok = False
+                    break
+            if ok:
+                for k in range(len(ncps)):
+                    out += ncps[k]
+                i += m
+                continue
+        out += cps[i]
+        i += 1
+    return out
+
+
+# 元素改名:替换文档中的元素引用/标签/交叉引用
+def replace_element(text: String, old: String, new: String) -> String:
+    var out = text
+    out = replace_pair(out, "#元素[\"", old, "\"]", "#元素[\"", new, "\"]")
+    out = replace_pair(out, "#设定元素[\"", old, "\"]", "#设定元素[\"", new, "\"]")
+    out = replace_pair(out, "#元素(\"", old, "\")", "#元素(\"", new, "\")")
+    out = replace_pair(out, "#设定元素(\"", old, "\")", "#设定元素(\"", new, "\")")
+    out = replace_markup(out, old, new)
+    return out
+
+
+# 形如 "#X["old"]" → "#X["new"]" 的替换
+def replace_pair(text: String, pre_o: String, old: String, suf_o: String, pre_n: String, new: String, suf_n: String) -> String:
+    var out = String("")
+    var cps = to_codepoints(text)
+    var pre_ocps = to_codepoints(pre_o)
+    var ocps = to_codepoints(old)
+    var suf_ocps = to_codepoints(suf_o)
+    var pre_ncps = to_codepoints(pre_n)
+    var ncps = to_codepoints(new)
+    var suf_ncps = to_codepoints(suf_n)
+    var i = 0
+    var n = len(cps)
+    var lp = len(pre_ocps)
+    var lo = len(ocps)
+    var ls = len(suf_ocps)
+    while i < n:
+        var ok = False
+        if i + lp + lo + ls <= n:
+            ok = True
+            for j in range(lp):
+                if cps[i + j] != pre_ocps[j]:
+                    ok = False; break
+            if ok:
+                for j in range(lo):
+                    if cps[i + lp + j] != ocps[j]:
+                        ok = False; break
+            if ok:
+                for j in range(ls):
+                    if cps[i + lp + lo + j] != suf_ocps[j]:
+                        ok = False; break
+        if ok:
+            for k in range(len(pre_ncps)):
+                out += pre_ncps[k]
+            for k in range(len(ncps)):
+                out += ncps[k]
+            for k in range(len(suf_ncps)):
+                out += suf_ncps[k]
+            i += lp + lo + ls
+            continue
+        out += cps[i]
+        i += 1
+    return out
+
+
+# 形如 "level: n)["old"]" → "level: n)["new"]"
+def replace_markup(text: String, old: String, new: String) -> String:
+    var out = text
+    out = replace_plain(out, "[" + old + "]", "[" + new + "]")
+    out = replace_plain(out, "<" + old + ">", "<" + new + ">")
+    out = replace_plain(out, "@" + old, "@" + new)
+    return out
+
+
+def cmd_rename(doc_dir: String, csv_path: String, old: String, new: String) raises:
+    var files = collect_typ_files(doc_dir)
+    for f in files:
+        var text = read_text(f)
+        var replaced = replace_element(text, old, new)
+        if replaced != text:
+            write_text(f, replaced)
+            print("  [文档]", f)
+    if Path(csv_path).exists():
+        var csv_text = read_text(csv_path)
+        var csv_new = replace_plain(csv_text, old, new)
+        if csv_new != csv_text:
+            write_text(csv_path, csv_new)
+            print("  [CSV]", csv_path)
+    print("已重命名元素 ", old, " -> ", new, sep="")
+
+
 def main() raises:
     var argv = sys_argv()
     if len(argv) == 0:
@@ -567,6 +674,11 @@ def main() raises:
         cmd_cleanup(doc_dir, csv_path)
     elif cmd == "排序":
         cmd_sort(doc_dir, csv_path)
+    elif cmd == "改名":
+        if len(argv) < start + 3:
+            print("用法: 元素工具 改名 旧id 新id")
+            return
+        cmd_rename(doc_dir, csv_path, argv[start + 1], argv[start + 2])
     else:
         print("未知命令: ", cmd)
 
