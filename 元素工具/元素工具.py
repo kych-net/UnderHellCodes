@@ -284,12 +284,16 @@ def _rename_in_csv(csv_path: Path, old: str, new: str) -> int:
     text = csv_path.read_text(encoding="utf-8")
     lines = text.splitlines()
     changed = 0
+    id_set = set()
     for i, line in enumerate(lines):
         if i == 0:
             continue  # 表头
+        if line and not line.startswith(","):
+            id_set.add(line.split(",")[0].strip())
         cols = line.split(",")
         for j, c in enumerate(cols):
-            if c.strip() == old:
+            if c.strip() == old and (j > 0 or new not in id_set):
+                # id 列(j==0)与新 id 撞名时不改,避免 CSV 出现重复 id 行(旧名重复/别名等用词自行处理)
                 cols[j] = c.replace(old, new)
                 changed += 1
         lines[i] = ",".join(cols)
