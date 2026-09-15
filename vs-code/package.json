@@ -1,0 +1,63 @@
+{
+  "name": "underhell-elements",
+  "displayName": "地狱之下·元素工具",
+  "description": "为 UnderHell 仓库的 Typst 正文提供元素系统支持:悬停/跳转/诊断/高亮,及补全/清理/排序/改名。",
+  "version": "0.1.0",
+  "publisher": "kych-net",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Programming Languages", "Linters"],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/*.typ",
+    "workspaceContains:**/元素系统.csv"
+  ],
+  "contributes": {
+    "commands": [
+      { "command": "underhell.elements.scan", "title": "元素:扫描诊断" },
+      { "command": "underhell.elements.complement", "title": "元素:补全缺失到CSV" },
+      { "command": "underhell.elements.cleanup", "title": "元素:清理CSV孤儿" },
+      { "command": "underhell.elements.sort", "title": "元素:按文档顺序排序CSV" },
+      { "command": "underhell.elements.rename", "title": "元素:重命名ID" },
+      { "command": "underhell.elements.refresh", "title": "元素:刷新缓存" }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "editorLangId == typst",
+          "command": "underhell.elements.rename",
+          "group": "9_underhell"
+        }
+      ],
+      "commandPalette": [
+        { "command": "underhell.elements.rename", "when": "editorHasSelection" }
+      ]
+    },
+    "semanticTokenTypes": [
+      { "id": "element.id", "superType": "variable", "description": "元素系统 id" }
+    ],
+    "semanticTokenScopes": [
+      { "scopes": { "element.id": ["variable.name"] } }
+    ],
+    "configuration": {
+      "title": "地狱之下元素",
+      "properties": {
+        "underhell.elements.repoRoot": {
+          "type": "string",
+          "default": "",
+          "description": "可选覆盖仓库根(含 文档/ 的目录)。留空则自动从工作区探测。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "node scripts/package.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.0.0",
+    "typescript": "^5.4.0"
+  }
+}
