@@ -8,6 +8,9 @@ import { parseTypText } from './parse'
 import { registerHover, registerDefinition, registerSemanticTokens } from './providers'
 import { registerCommands } from './commands'
 import { refreshAllDocs } from './diagnostics'
+import { ElementWebviewProvider } from './elementView'
+
+const ELEMENT_VIEW_ID = 'underhellElementExplorer.view'
 
 export function activate(context: vscode.ExtensionContext): void {
   const csv = new CsvCache()
@@ -42,10 +45,12 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(typWatcher)
 
   // 元素系统.csv 变更 -> 失效缓存并刷新诊断。
+  const elementView = new ElementWebviewProvider(app)
+  context.subscriptions.push(vscode.window.registerWebviewViewProvider(ELEMENT_VIEW_ID, elementView))
   const csvWatcher = vscode.workspace.createFileSystemWatcher('**/元素系统.csv')
-  csvWatcher.onDidChange(() => { csv.invalidate(); refreshAllDocs(app) })
-  csvWatcher.onDidDelete(() => { csv.invalidate(); refreshAllDocs(app) })
-  csvWatcher.onDidCreate(() => { csv.invalidate(); refreshAllDocs(app) })
+  csvWatcher.onDidChange(() => { csv.invalidate(); refreshAllDocs(app); elementView.refresh() })
+  csvWatcher.onDidDelete(() => { csv.invalidate(); refreshAllDocs(app); elementView.refresh() })
+  csvWatcher.onDidCreate(() => { csv.invalidate(); refreshAllDocs(app); elementView.refresh() })
   context.subscriptions.push(csvWatcher)
 
   registerHover(app)

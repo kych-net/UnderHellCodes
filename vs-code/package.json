@@ -12,6 +12,20 @@
     "workspaceContains:**/元素系统.csv"
   ],
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "underhellElementExplorer",
+          "title": "元素管理",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "underhellElementExplorer": [
+        { "type": "webview", "id": "underhellElementExplorer.view", "name": "元素表" }
+      ]
+    },
     "commands": [
       { "command": "underhell.elements.scan", "title": "元素:扫描诊断" },
       { "command": "underhell.elements.complement", "title": "元素:补全缺失到CSV" },
@@ -33,10 +47,10 @@
       ]
     },
     "semanticTokenTypes": [
-      { "id": "element.id", "superType": "variable", "description": "元素系统 id" }
+      { "id": "elementId", "superType": "variable", "description": "元素系统 id" }
     ],
     "semanticTokenScopes": [
-      { "scopes": { "element.id": ["variable.name"] } }
+      { "scopes": { "elementId": ["variable.name"] } }
     ],
     "configuration": {
       "title": "地狱之下元素",

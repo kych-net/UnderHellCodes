@@ -4,7 +4,7 @@ import * as vscode from 'vscode'
 import { refAtPosition } from './parse'
 import type { AppContext } from './context'
 
-const defKind = new vscode.SemanticTokensLegend(['element.id'])
+const defKind = new vscode.SemanticTokensLegend(['elementId'])
 
 export function registerHover(app: AppContext): void {
   app.ctrl.subscriptions.push(
@@ -89,7 +89,7 @@ export function registerSemanticTokens(app: AppContext): void {
   const provider: vscode.DocumentSemanticTokensProvider = {
     provideDocumentSemanticTokens(doc) {
       const refs = app.index.get(doc.uri)
-      const tokens = new vscode.SemanticTokensBuilder(new vscode.SemanticTokensLegend(['element.id']))
+      const tokens = new vscode.SemanticTokensBuilder(new vscode.SemanticTokensLegend(['elementId']))
       if (refs) {
         for (const r of refs) {
           tokens.push(r.range.start.line, r.range.start.character, r.range.end.character - r.range.start.character, 0)
