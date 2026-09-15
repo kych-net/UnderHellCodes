@@ -4,6 +4,7 @@
   "description": "为 UnderHell 仓库的 Typst 正文提供元素系统支持:悬停/跳转/诊断/高亮,及补全/清理/排序/改名。",
   "version": "0.1.0",
   "publisher": "kych-net",
+  "repository": { "type": "git", "url": "https://gitcode.com/CrossDark/UnderHellCodes.git" },
   "engines": { "vscode": "^1.88.0" },
   "categories": ["Programming Languages", "Linters"],
   "main": "./out/extension.js",
