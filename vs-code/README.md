@@ -31,4 +31,14 @@ npm run compile    # 编译到 out/
 F5                 # 在 Extension Development Host 里调试
 ```
 
-核心逻辑在 `src/element-core.ts`，是与旧的 `元素工具.py` 等价的 TypeScript 重写；`src/parse.ts` 负责带位置的解析，其余为插件的 VS Code 集成层。
+## 编译安装
+
+```bash
+npm install        # 装依赖
+npm run compile    # 编译到 out/
+npm run package    # 打包出 .vsix
+```
+
+VS Code 扩展面板(⌘⇧X) → 右上角 `…` → **Install from VSIX…** → 选生成的 `.vsix` → 重载窗口。
+
+要求 VS Code 1.88+(右侧栏)。核心逻辑在 `src/element-core.ts`，是与旧的 `元素工具.py` 等价的 TypeScript 重写；`src/parse.ts` 负责带位置的解析，其余为插件的 VS Code 集成层。
