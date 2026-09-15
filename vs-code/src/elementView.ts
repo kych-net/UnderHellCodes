@@ -5,6 +5,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as vscode from 'vscode'
 import type { AppContext } from './context'
+import * as core from './element-core'
 
 export interface ElemRow {
   id: string
@@ -23,7 +24,7 @@ export interface Snapshot {
 }
 
 function buildSnapshot(app: AppContext): Snapshot {
-  const data = app.repoRoot ? app.csv.get(app.repoRoot) : undefined
+  const data = app.repoRoot ? app.csv.getOrLoad(app.repoRoot) : undefined
   // 引用/定义统计
   const defCount = new Map<string, number>()
   const referenced = new Set<string>()
@@ -79,6 +80,8 @@ function saveCell(app: AppContext, id: string, col: string, value: string): void
 
 export class ElementWebviewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView
+  /** 外部注入:重建文档索引(改名后正文已变)。 */
+  refreshAll?: () => Promise<void>
 
   constructor(private app: AppContext) {}
 
@@ -116,9 +119,27 @@ export class ElementWebviewProvider implements vscode.WebviewViewProvider {
         this.render()
         break
       }
+      case 'rename': {
+        if (!this.app.repoRoot) throw new Error('未定位仓库根')
+        const oldId = String(msg.oldId)
+        const newId = String(msg.newId)
+        if (oldId && newId && oldId !== newId) {
+          core.rename({ repoRoot: this.app.repoRoot }, oldId, newId)
+          this.app.csv.invalidate()
+          void (this.refreshAll ? this.refreshAll() : Promise.resolve()).then(() => this.render())
+        }
+        break
+      }
       case 'cmd': {
         const name = String(msg.cmd)
-        void vscode.commands.executeCommand(`underhell.elements.${name}`).then(() => this.render())
+        void (async () => {
+          try {
+            await vscode.commands.executeCommand(`underhell.elements.${name}`)
+          } catch (e) {
+            void vscode.window.showErrorMessage(`元素管理：${(e as Error).message}`)
+          }
+          this.render()
+        })()
         break
       }
       default:
@@ -127,9 +148,12 @@ export class ElementWebviewProvider implements vscode.WebviewViewProvider {
   }
 }
 
-// 数据注入须转义,防止 </script> 提前闭合。
-const esc = (s: unknown): string =>
+// 属性值注入须转义,防止引号截断与 </script> 提前闭合。
+const escAttr = (s: unknown): string =>
   JSON.stringify(s).replace(/</g, '\\u003c')
+// 文本内容注入须转义 HTML(不得用 JSON.stringify,否则内容会带双引号)。
+const escText = (s: unknown): string =>
+  String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 function html(s: Snapshot): string {
   const thead = ['元素', ...s.headers.slice(1), '状态']
@@ -139,14 +163,14 @@ function html(s: Snapshot): string {
   const tbody = s.rows
     .map(row => {
       const cells = row.terms
-        .map(t => `<td class="ed" data-id="${esc(row.id)}" data-col="${esc(t.col)}">${esc(t.value || row.id)}</td>`)
+        .map(t => `<td class="ed" contenteditable spellcheck="false" data-id="${escAttr(row.id)}" data-col="${escAttr(t.col)}">${escText(t.value || row.id)}</td>`)
         .join('')
       let badge = ''
       if (!row.referenced) badge = '<span class="badge orphan">孤儿</span>'
       else if (row.defs === 0) badge = '<span class="badge nodef">未定义</span>'
       else if (row.defs > 1) badge = `<span class="badge dup">重复×${row.defs}</span>`
       else badge = '<span class="badge ok"></span>'
-      return `<tr><td class="id">${esc(row.id)}</td>${cells}<td>${badge}</td></tr>`
+      return `<tr><td class="id" contenteditable spellcheck="false" data-id="${escAttr(row.id)}">${escText(row.id)}</td>${cells}<td>${badge}</td></tr>`
     })
     .join('')
 
@@ -198,6 +222,14 @@ function html(s: Snapshot): string {
     document.querySelectorAll('button[data-cmd]').forEach(function (b) {
       b.addEventListener('click', function () {
         vsc.postMessage({ type: 'cmd', cmd: b.getAttribute('data-cmd') });
+      });
+    });
+    document.querySelectorAll('td.id').forEach(function (td) {
+      td.addEventListener('blur', function () {
+        var oldId = td.getAttribute('data-id');
+        var newId = td.textContent;
+        if (newId === '' || newId === oldId) { td.textContent = oldId; return; }
+        vsc.postMessage({ type: 'rename', oldId: oldId, newId: newId });
       });
     });
     document.querySelectorAll('td.ed').forEach(function (td) {

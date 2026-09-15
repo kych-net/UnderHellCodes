@@ -107,8 +107,10 @@ export function registerCommands(app: AppContext, hooks: CommandHooks): void {
   }))
 
   ctrl.subscriptions.push(vscode.commands.registerCommand('underhell.elements.refresh', async () => {
-    await refreshAll()
-    vscode.window.showInformationMessage('元素缓存已刷新')
+    try {
+      await refreshAll()
+      vscode.window.showInformationMessage('元素缓存已刷新')
+    } catch (e) { showErr(e as Error) }
   }))
 
   async function refreshAll(): Promise<void> {

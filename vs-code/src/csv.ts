@@ -71,6 +71,14 @@ export class CsvCache {
     return this.cache.get(repoRoot)
   }
 
+  /** 读取或加载;缓存缺失时加载,文件缺失/解析失败返回 undefined。 */
+  getOrLoad(repoRoot: string): CsvData | undefined {
+    if (!this.cache.has(repoRoot)) {
+      try { this.load(repoRoot) } catch { return undefined }
+    }
+    return this.cache.get(repoRoot)
+  }
+
   /** 返回当前数据;缺失或过期则加载。 */
   load(repoRoot: string): CsvData {
     const uri = csvUri(repoRoot)

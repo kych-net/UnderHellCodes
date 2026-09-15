@@ -23,7 +23,7 @@ export function refreshDocument(app: AppContext, uri: vscode.Uri): void {
   if (!refs) { coll.delete(uri); return }
   const ds: vscode.Diagnostic[] = []
   const counts = definitionCounts(app)
-  const data = app.repoRoot ? app.csv.get(app.repoRoot) : undefined
+  const data = app.repoRoot ? app.csv.getOrLoad(app.repoRoot) : undefined
   for (const r of refs) {
     if (r.isDefinition && (counts.get(r.id) ?? 0) > 1) {
       const d = new vscode.Diagnostic(
