@@ -654,7 +654,7 @@ def main() raises:
         return
     var cmd = argv[start]
     var doc_dir = guess_root() + "/文档"
-    var csv_path = doc_dir + "/元素系统.csv"
+    var csv_path = doc_dir + "/附件/元素系统.csv"
     var i = start + 1
     while i < len(argv):
         var a = argv[i]

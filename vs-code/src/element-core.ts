@@ -11,7 +11,7 @@ export interface CoreOpts {
   repoRoot: string
   /** 文档目录,缺省 <repoRoot>/文档 */
   dir?: string
-  /** CSV 路径,缺省 <repoRoot>/文档/元素系统.csv */
+  /** CSV 路径,缺省 <repoRoot>/文档/附件/元素系统.csv */
   csv?: string
 }
 
@@ -19,7 +19,7 @@ function docDir(opts: CoreOpts): string {
   return opts.dir ?? path.join(opts.repoRoot, '文档')
 }
 function csvPath(opts: CoreOpts): string {
-  return opts.csv ?? path.join(opts.repoRoot, '文档', '元素系统.csv')
+  return opts.csv ?? path.join(opts.repoRoot, '文档', '附件', '元素系统.csv')
 }
 
 // 元素 id 提取模式。对应 元素工具.py 的 PATTERNS / SETTING_PATTERNS。

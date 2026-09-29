@@ -54,7 +54,7 @@ function buildSnapshot(app: AppContext): Snapshot {
 function saveCell(app: AppContext, id: string, col: string, value: string): void {
   if (!app.repoRoot) throw new Error('未定位仓库根')
   if (/[,\r\n]/.test(value)) throw new Error('名词不能包含逗号或换行')
-  const p = path.join(app.repoRoot, '文档', '元素系统.csv')
+  const p = path.join(app.repoRoot, '文档', '附件', '元素系统.csv')
   let text = fs.readFileSync(p, 'utf-8')
   const nl = text.includes('\r\n') ? '\r\n' : '\n'
   const lines = text.replace(/\r\n/g, '\n').split('\n')

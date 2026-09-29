@@ -43,7 +43,7 @@ export function findRepoRoot(workspaceFolder?: vscode.WorkspaceFolder): string |
 }
 
 export function csvUri(repoRoot: string): vscode.Uri {
-  return vscode.Uri.file(path.join(repoRoot, '文档', '元素系统.csv'))
+  return vscode.Uri.file(path.join(repoRoot, '文档', '附件', '元素系统.csv'))
 }
 
 /** 把 CSV 文本解析为 CsvData(复用 element-core.parseCsvText)。 */

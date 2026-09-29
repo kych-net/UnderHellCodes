@@ -50,7 +50,7 @@ def _guess_root() -> Path:
 
 ROOT = _guess_root()
 DEFAULT_DOC_DIR = ROOT / "文档"
-DEFAULT_CSV = ROOT / "文档" / "元素系统.csv"
+DEFAULT_CSV = ROOT / "文档" / "附件" / "元素系统.csv"
 
 # 提取元素 id 的模式。捕获组即得到概念 id(字符串为引号内,内容形式为 [] 内)
 PATTERNS = [
@@ -322,7 +322,7 @@ def build_parser() -> argparse.ArgumentParser:
     parent.add_argument("--dir", type=Path, dest="dir", default=None,
                         help="文档目录(默认 仓库根/文档)")
     parent.add_argument("--csv", type=Path, dest="csv", default=DEFAULT_CSV,
-                        help="元素系统 CSV 路径(默认 仓库根/文档/元素系统.csv)")
+                        help="元素系统 CSV 路径(默认 仓库根/文档/附件/元素系统.csv)")
 
     sub = ap.add_subparsers(dest="command", required=True)
 
